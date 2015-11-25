@@ -16,7 +16,7 @@ setup(name='OptiType',
       scripts=['bin/optitype'],
       # packages that we depend on
       install_requires=[
-        'Coopr>=3.5,<4.0',
+        'Pyomo>=4.2',
         'argparse==1.2.1',
         'biopython==1.65',
         'matplotlib==1.4.3',
