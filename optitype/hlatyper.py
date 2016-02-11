@@ -254,7 +254,7 @@ def get_compact_model(hit_df, weak_hit_df=None, weight=None):
         unique_mtx = pd.concat([hit_df.drop_duplicates(), weak_hit_df.drop_duplicates()])
     else:
         unique_mtx = hit_df.drop_duplicates()
-    
+
     return unique_mtx, occurence
 
 
@@ -654,7 +654,7 @@ def plot_coverage(outfile, coverage_matrices, allele_data, features, features_us
 
         (0.99, 0.23, 0.23), # mismatch, paired, unique
         (0.99, 0.49, 0.49), # mismatch, paired, shared
-        
+
         (0.14, 0.55, 0.72), # mismatch, unpaired, unique
         (0.14, 0.55, 0.72), # mismatch, mispaired, unique
         (0.33, 0.70, 0.88), # mismatch, unpaired, shared
@@ -703,16 +703,9 @@ def plot_coverage(outfile, coverage_matrices, allele_data, features, features_us
         perfect_mispaired_shared = start_end_zeros(shared_weighting.dot(coverage[0][2]))
         mismatch_mispaired_shared = start_end_zeros(shared_weighting.dot(coverage[1][2]))
 
-        # Exon annotation
-        i_start = 1  # position of last feature's end. It's one because we padded with zeros above
-        for _, ft in get_features(allele, features, features_used).iterrows():
-            if ft['feature'] == 'exon':
-                plot.axvspan(i_start, i_start + ft['length'], facecolor='black', alpha=0.1, linewidth=0, zorder=1)
-            i_start += ft['length']
-
-
-        areas = plot.stackplot(np.arange(seq_length+2), # seq_length+2 because of the zero padding at either end
-            perfect_paired_unique + 0.001,  # so that 0 isn't -inf on the logplot, but still below cutoff
+        # Create stacked Data.Frame with coverage
+        stacked_coverage = np.row_stack((
+            perfect_paired_unique,
             perfect_paired_shared,
 
             perfect_unpaired_unique,
@@ -722,11 +715,48 @@ def plot_coverage(outfile, coverage_matrices, allele_data, features, features_us
 
             mismatch_paired_unique,
             mismatch_paired_shared,
-            
+
             mismatch_unpaired_unique,
             mismatch_mispaired_unique,
             mismatch_unpaired_shared,
-            mismatch_mispaired_shared,
+            mismatch_mispaired_shared,))
+
+        # Exon annotation
+        i_start = 1  # position of last feature's end. It's one because we padded with zeros above
+        exon_index = np.zeros((seq_length+2,), dtype=np.int) # array the length of the plot area/coverage array
+        for _, ft in get_features(allele, features, features_used).iterrows():
+            if ft['feature'] == 'exon':
+                plot.axvspan(i_start, i_start + ft['length'], facecolor='black', alpha=0.1, linewidth=0, zorder=1)
+                # For exons 2 and 3, set exon_index to 1
+                exon_index[i_start:i_start + ft['length']] = 1
+            i_start += ft['length']
+
+        # For a given allele, save coverage on exons 2 and 3 to tsv
+        # To comply with file naming convetions, we re-create out_dir and date that were assigned OptiTypePipeline.py
+        import os
+        out_dir = os.path.dirname(outfile)
+        out_prefix = os.path.basename(out_dir)
+        print now(), "Exons are at positions", exon_index
+        exon_coverage_sum = np.sum(stacked_coverage, axis=0)
+        np.savetxt("{}/{}_{}_coverage.tsv".format(out_dir, out_prefix, allele), np.row_stack((exon_coverage_sum, exon_index)), fmt='%i')
+
+        areas = plot.stackplot(np.arange(seq_length+2), # seq_length+2 because of the zero padding at either end
+            #perfect_paired_unique + 0.001,  # so that 0 isn't -inf on the logplot, but still below cutoff
+            #perfect_paired_shared,
+
+            #perfect_unpaired_unique,
+            #perfect_mispaired_unique,
+            #perfect_unpaired_shared,
+            #perfect_mispaired_shared,
+
+            #mismatch_paired_unique,
+            #mismatch_paired_shared,
+
+            #mismatch_unpaired_unique,
+            #mismatch_mispaired_unique,
+            #mismatch_unpaired_shared,
+            #mismatch_mispaired_shared,
+            stacked_coverage + 0.0001,
 
             linewidth=0, colors=area_colors, zorder=5)
 
